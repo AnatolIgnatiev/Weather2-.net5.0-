@@ -1,0 +1,179 @@
+﻿
+@{
+    ViewData["Title"] = "GitHubSearch";
+}
+<head>
+    <h1>Search repositories on GitHub</h1>    
+</head>
+<body>
+    <div>    
+        <strong>Query:</strong><input id="txtQuery" type="text"/>    
+        <br />    
+        <br />    
+        <button id="btnSubmit">Search</button><div class="loading" id="processing" style="display: none">Loading&#8230;</div>
+    </div> 
+    <h2>Results Found</h2> <label id="totalResultsFound"></label>
+    <div>
+        <ul id="resultsList"></ul>
+    </div>
+</body>
+<footer>
+    <nav>
+        <ul class="pagination" id="pagination"></ul>
+    </nav>
+</footer>
+
+<script>
+
+    var totalResultsCounter = 0;
+    var pageNumber = 1;
+    var resultsPerPage = 30;
+    var numberOfPages = 0;
+    var query;
+    $("#btnSubmit").click(function () {
+       Search();
+    });
+    $("#txtQuery").keyup(function (event){
+        if(event.keyCode == 13){
+             Search();
+         }
+    });
+
+    $('#pagination').on('click', 'button', function() { 
+        Pagination($(this).val());
+     });
+
+    function BuildPagination(pageNumber, numberOfPages){
+        $('#pagination').empty();
+        var pagintion = document.getElementById("pagination");
+
+        var pageNumberInputBar = document.createElement("input");
+        pageNumberInputBar.setAttribute("id","pageNumberInputBar");
+        pageNumberInputBar.setAttribute("type","text");
+        pageNumberInputBar.setAttribute("placeholder","#");
+        pagintion.appendChild(pageNumberInputBar);
+        
+     $('#pageNumberInputBar').keyup(function(event){
+         if(event.keyCode == 13){
+             Pagination($(this).val());
+         }
+     });
+        var firstBtn = document.createElement("button");
+        firstBtn.setAttribute("class","btn btn-primary");
+        firstBtn.setAttribute("value","1");
+        firstBtn.innerHTML = "1";
+        pagintion.appendChild(firstBtn);
+
+        if(numberOfPages <= 3){
+        for (let i=1; i<numberOfPages; i++) {
+            $('#pagination').append(`<button class="btn btn-primary"
+            value="${i+1}">${i+1}</button>`)
+            }
+        }
+        else if(numberOfPages >= 3 && pageNumber == 1){
+            for (let i=0; i<3; i++) {
+            $('#pagination').append(`<button class="btn btn-primary"
+            value="${pageNumber+i}">${pageNumber+i}</button>`)
+            }
+        }
+        else if(numberOfPages > 3 && pageNumber == numberOfPages){
+            for (let i=pageNumber-2; i<pageNumber; i++) {
+            $('#pagination').append(`<button class="btn btn-primary"
+            value="${i}">${i}</button>`)
+            }
+        }
+        else{
+        for (let i=-1; i<2; i++) {
+            $('#pagination').append(`<button class="btn btn-primary"
+            value="${pageNumber+i}">${pageNumber+i}</button>`)
+            }
+        }
+        var lastBtn = document.createElement("button");
+        lastBtn.setAttribute("class","btn btn-primary");
+        lastBtn.setAttribute("value",`${numberOfPages}`);
+        lastBtn.innerHTML = `${numberOfPages}`;
+        pagintion.appendChild(lastBtn);
+    }
+
+    function GetResults(query, pageNumber, resultsPerPage, callback){
+         var $foundData;
+         $.ajax({ 
+            url: `https://localhost:44350/Home/GetGitHubSearchResults?query=${query}&pageNumber=${pageNumber}&resultsPerPage=${resultsPerPage}`,    
+            type: "POST",    
+            success: function(result) {
+                callback (result);
+            }
+                });
+            return $foundData;
+    }
+    function Search(){
+        ShowProcessing();
+         query = $("#txtQuery").val();
+        if (query.length > 0)    
+        { 
+            GetResults(query, pageNumber, resultsPerPage, function (result){
+                totalResultsCounter = JSON.parse(result[0]).totalResultsCount;
+                if(totalResultsCounter > resultsPerPage){
+                    numberOfPages = Math.ceil(totalResultsCounter/resultsPerPage);
+                    if(totalResultsCounter > 1000){ //only first 1000 results are avalable for search
+                        numberOfPages = 34;
+                    }
+                    BuildPagination(pageNumber,numberOfPages);
+                }
+                let resultsCounterLabel = document.getElementById("totalResultsFound");
+                resultsCounterLabel.setAttribute("value",`${totalResultsCounter}`)
+                resultsCounterLabel.innerHTML = `${totalResultsCounter}`
+                result.forEach(function(element) {
+                    var parsedElement = JSON.parse(element);                    
+                    var resultsList = document.getElementById("resultsList");
+                    var item = CreateListItem(parsedElement);
+                    resultsList.appendChild(item);
+                });
+            }); 
+            HideProcessing();
+        }
+        else    
+        {   
+            HideProcessing();
+            alert("Not Found");    
+        }    
+    }
+    function Pagination (pageNum){
+        pageNumber = parseInt(pageNum)
+        GetResults(query, pageNumber, resultsPerPage, function (result){ 
+            $("#resultsList").empty();
+                result.forEach(function(element) {
+                    var parsedElement = JSON.parse(element);                    
+                    var resultsList = document.getElementById("resultsList");
+                    var item = CreateListItem(parsedElement);
+                    resultsList.appendChild(item);
+                });
+        });
+        BuildPagination(pageNumber, numberOfPages);
+    }
+
+    function CreateListItem(data){
+         var list = document.createElement('li');
+         list.innerHTML = 
+            `<div>
+                 <strong><a href= ${data.html_url} target="_blank"><label id="repoName">${data.name}</label></a></strong>
+            </div>
+            <div>
+                <label id="description">${data.description}</label>
+            </div>
+            <div>
+                <small id="language">${data.updated_at}</small>
+                <small id="updatedAt">${data.language}</small>
+            </div>`;
+         return list;
+    };
+    function ShowProcessing(){
+        var processing = document.getElementById("processing");
+        processing.setAttribute("style","display: block");
+    };
+    function HideProcessing(){
+        var processing = document.getElementById("processing");
+        processing.setAttribute("style","display: none");
+    }
+
+</script>    
